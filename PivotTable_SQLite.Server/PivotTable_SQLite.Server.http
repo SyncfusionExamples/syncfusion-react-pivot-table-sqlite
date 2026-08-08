@@ -1,0 +1,6 @@
+@PivotTable_SQLite.Server_HostAddress = https://localhost:7086
+
+GET {{PivotTable_SQLite.Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
