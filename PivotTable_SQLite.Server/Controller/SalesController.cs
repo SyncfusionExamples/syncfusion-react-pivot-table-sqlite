@@ -26,7 +26,7 @@ namespace PivotTable_SQLite.Server.Controllers
         /// <returns>Returns a list of all sales records from the database.</returns>
         [HttpGet]
         [Route("api/[controller]")]
-        public List<SalesData> GetSalesData()
+        public async Task<List<SalesData>> GetSalesData()
         {
             const string Query = @"SELECT * FROM salesdata ORDER BY orderid;";
 
@@ -36,10 +36,10 @@ namespace PivotTable_SQLite.Server.Controllers
 
 
             using var Connection = new SqliteConnection(_connectionString);
-            Connection.Open();
+            await Connection.OpenAsync();
 
             using var Command = new SqliteCommand(Query, Connection);
-            using var Reader = Command.ExecuteReader();
+            using var Reader = await Command.ExecuteReaderAsync();
 
             var DataTable = new DataTable();
             DataTable.Load(Reader);
@@ -75,10 +75,11 @@ namespace PivotTable_SQLite.Server.Controllers
         /// </returns>
         [HttpPost]
         [Route("api/[controller]")]
-        public object Post([FromBody] DataManagerRequest DataManagerRequest)
+        public async Task<object> Post([FromBody] DataManagerRequest DataManagerRequest)
         {
             // Retrieve all sales data from the database
-            IQueryable<SalesData> DataSource = GetSalesData().AsQueryable();
+            List<SalesData> salesData = await GetSalesData();
+            IQueryable<SalesData> DataSource = salesData.AsQueryable();
 
             // Get the total number of records
             int totalRecordsCount = DataSource.Count();
@@ -162,7 +163,7 @@ namespace PivotTable_SQLite.Server.Controllers
         /// <returns>Returns the inserted record with its new OrderID.</returns>
         [HttpPost]
         [Route("api/[controller]/Insert")]
-        public IActionResult Insert([FromBody] CRUDModel<SalesData> value)
+        public async Task<IActionResult> Insert([FromBody] CRUDModel<SalesData> value)
         {
             try
             {
@@ -174,7 +175,7 @@ namespace PivotTable_SQLite.Server.Controllers
         ";
 
                 using var conn = new SqliteConnection(_connectionString);
-                conn.Open();
+                await conn.OpenAsync();
 
                 using var cmd = new SqliteCommand(sql, conn);
 
@@ -191,7 +192,7 @@ namespace PivotTable_SQLite.Server.Controllers
                 cmd.Parameters.AddWithValue("@SalesPerson", (object?)value.value?.SalesPerson ?? DBNull.Value);
 
                 // Execute the query and get the newly created OrderID
-                var newId = Convert.ToInt32(cmd.ExecuteScalar());
+                var newId = Convert.ToInt32(await cmd.ExecuteScalarAsync());
 
                 // Update the value object with the new ID
                 if (value.value != null) value.value.OrderID = newId;
@@ -212,7 +213,7 @@ namespace PivotTable_SQLite.Server.Controllers
         /// <returns>Returns the number of rows updated.</returns>
         [HttpPost]
         [Route("api/[controller]/Update")]
-        public IActionResult Update([FromBody] CRUDModel<SalesData> value)
+        public async Task<IActionResult> Update([FromBody] CRUDModel<SalesData> value)
         {
             if (value?.value == null || value.value.OrderID == null)
                 return BadRequest("OrderID and payload are required.");
@@ -235,7 +236,7 @@ namespace PivotTable_SQLite.Server.Controllers
         ";
 
                 using var conn = new SqliteConnection(_connectionString);
-                conn.Open();
+                await conn.OpenAsync();
 
                 using var cmd = new SqliteCommand(sql, conn);
 
@@ -253,7 +254,7 @@ namespace PivotTable_SQLite.Server.Controllers
                 cmd.Parameters.AddWithValue("@OrderID", value.value.OrderID);
 
                 // Execute the update
-                var rows = cmd.ExecuteNonQuery();
+                var rows = await cmd.ExecuteNonQueryAsync();
                 return Ok(new { updated = rows });
             }
             catch (Exception ex)
@@ -270,7 +271,7 @@ namespace PivotTable_SQLite.Server.Controllers
         /// <returns>Returns the number of rows deleted.</returns>
         [HttpPost]
         [Route("api/[controller]/Remove")]
-        public IActionResult Remove([FromBody] CRUDModel<SalesData> value)
+        public async Task<IActionResult> Remove([FromBody] CRUDModel<SalesData> value)
         {
             if (value?.key == null)
                 return BadRequest("Missing key.");
@@ -283,13 +284,13 @@ namespace PivotTable_SQLite.Server.Controllers
                 const string sql = @"DELETE FROM salesdata WHERE orderid = @OrderID;";
 
                 using var conn = new SqliteConnection(_connectionString);
-                conn.Open();
+                await conn.OpenAsync();
 
                 using var cmd = new SqliteCommand(sql, conn);
                 cmd.Parameters.AddWithValue("@OrderID", id);
 
                 // Execute the delete
-                var rows = cmd.ExecuteNonQuery();
+                var rows = await cmd.ExecuteNonQueryAsync();
                 return Ok(new { deleted = rows, key = id });
             }
             catch (Exception ex)
